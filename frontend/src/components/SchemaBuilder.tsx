@@ -39,7 +39,7 @@ export default function SchemaBuilder({ initialData, onSubmit, onCancel, isLoadi
   const [version, setVersion] = useState(initialData?.version || '1.0');
   const [description, setDescription] = useState(initialData?.description || '');
   const [questions, setQuestions] = useState<QuestionFormData[]>(
-    initialData?.questions.map(q => ({
+    initialData?.questions?.map(q => ({
       questionText: q.questionText,
       maxPoints: q.maxPoints,
       evaluationCriteria: q.evaluationCriteria,
@@ -109,7 +109,8 @@ export default function SchemaBuilder({ initialData, onSubmit, onCancel, isLoadi
       name: name.trim(),
       version: version.trim(),
       description: description.trim(),
-      questions: questions.map(q => ({
+      questions: questions.map((q, index) => ({
+        questionNumber: index + 1,
         questionText: q.questionText.trim(),
         maxPoints: q.maxPoints,
         evaluationCriteria: q.evaluationCriteria.trim(),

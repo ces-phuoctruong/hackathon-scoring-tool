@@ -40,11 +40,13 @@ export interface QuestionScore {
   reasoning?: string;
   confidence: 'high' | 'medium' | 'low';
   flagForReview: boolean;
+  manuallyAdjusted?: boolean;
 }
 
 export interface TestResult {
   _id: string;
   schemaId: string;
+  scoringSchema?: ScoringSchema;
   candidateName?: string;
   originalImages: string[];
   extractedText: string;
@@ -52,8 +54,10 @@ export interface TestResult {
   scores: QuestionScore[];
   totalScore: number;
   maxScore: number;
-  status: 'pending' | 'processing' | 'scored' | 'reviewed';
+  status: 'pending' | 'processing' | 'extracted' | 'scored' | 'reviewed';
   reviewNotes?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
   createdAt: string;
   updatedAt: string;
 }

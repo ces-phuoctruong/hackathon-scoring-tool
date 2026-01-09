@@ -76,7 +76,9 @@ export default function SchemaList({ schemas, onEdit, onDelete, onSelect, select
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <button
+                  type="button"
                   onClick={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     onEdit(schema);
                   }}

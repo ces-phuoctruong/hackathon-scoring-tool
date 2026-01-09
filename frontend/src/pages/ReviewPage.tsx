@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { testApi, type ReviewUpdateData } from '../services/api';
 import type { TestResult, ScoringSchema, QuestionScore } from '../types';
 
-type TestWithSchema = TestResult & { schemaId: ScoringSchema };
+type TestWithSchema = TestResult & { scoringSchema: ScoringSchema };
 
 export default function ReviewPage() {
   const { id } = useParams<{ id: string }>();
@@ -184,7 +184,7 @@ export default function ReviewPage() {
     );
   }
 
-  const schema = test.schemaId;
+  const schema = test.scoringSchema;
 
   return (
     <div className="space-y-6">
@@ -598,7 +598,7 @@ function TestListView() {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {tests.map((test) => {
-                const schema = test.schemaId as unknown as { name: string; version: string } | null;
+                const schema = test.scoringSchema;
                 return (
                   <tr key={test._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
