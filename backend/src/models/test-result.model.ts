@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { IScoringSchema } from './scoring-schema.model';
 
 export interface IExtractedAnswer {
   questionNumber: number;
@@ -18,6 +19,7 @@ export interface IQuestionScore {
 
 export interface ITestResult extends Document {
   schemaId: mongoose.Types.ObjectId;
+  scoringSchema?: IScoringSchema;
   candidateName?: string;
   originalImages: string[];
   extractedText: string;
@@ -51,7 +53,7 @@ const QuestionScoreSchema = new Schema<IQuestionScore>({
 
 const TestResultSchema = new Schema<ITestResult>(
   {
-    schemaId: { type: Schema.Types.ObjectId, ref: 'ScoringSchema', required: true },
+    schemaId: { type: Schema.Types.ObjectId, required: true },
     candidateName: { type: String },
     originalImages: { type: [String], required: true },
     extractedText: { type: String, default: '' },
@@ -70,8 +72,18 @@ const TestResultSchema = new Schema<ITestResult>(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+// Virtual for populated scoring schema
+TestResultSchema.virtual('scoringSchema', {
+  ref: 'ScoringSchema',
+  localField: 'schemaId',
+  foreignField: '_id',
+  justOne: true,
+});
 
 // Calculate total score before saving
 TestResultSchema.pre('save', function (next) {
