@@ -1,11 +1,7 @@
 import { Router, Request, Response } from "express";
 import { upload } from "../config/upload.js";
-import {
-  TestResult,
-  ScoringSchema,
-  type IScoringSchema,
-} from "../models/index.js";
-import { extractTextFromMultipleImages } from "../services/claude-vision.service.js";
+import { TestResult, ScoringSchema } from "../models/index.js";
+import { extractTextFromMultipleImages } from "../services/gemini-vision.service.js";
 import { scoreAllAnswersParallel } from "../services/scoring.service.js";
 
 const router = Router();

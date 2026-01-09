@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import type { Question, RubricGuidelines, ScoringSchemaInput } from '../types';
+import { useState } from "react";
+import type { Question, RubricGuidelines, ScoringSchemaInput } from "../types";
 
 interface QuestionFormData {
   questionText: string;
@@ -22,28 +22,35 @@ interface SchemaBuilderProps {
 }
 
 const emptyQuestion: QuestionFormData = {
-  questionText: '',
+  questionText: "",
   maxPoints: 10,
-  evaluationCriteria: '',
-  sampleAnswer: '',
+  evaluationCriteria: "",
+  sampleAnswer: "",
 };
 
 const emptyRubric: RubricGuidelines = {
-  fullCredit: 'Complete and accurate answer demonstrating full understanding',
-  partialCredit: 'Partially correct answer with some understanding shown',
-  noCredit: 'Incorrect or no answer provided',
+  fullCredit: "Complete and accurate answer demonstrating full understanding",
+  partialCredit: "Partially correct answer with some understanding shown",
+  noCredit: "Incorrect or no answer provided",
 };
 
-export default function SchemaBuilder({ initialData, onSubmit, onCancel, isLoading }: SchemaBuilderProps) {
-  const [name, setName] = useState(initialData?.name || '');
-  const [version, setVersion] = useState(initialData?.version || '1.0');
-  const [description, setDescription] = useState(initialData?.description || '');
+export default function SchemaBuilder({
+  initialData,
+  onSubmit,
+  onCancel,
+  isLoading,
+}: SchemaBuilderProps) {
+  const [name, setName] = useState(initialData?.name || "");
+  const [version, setVersion] = useState(initialData?.version || "1.0");
+  const [description, setDescription] = useState(
+    initialData?.description || ""
+  );
   const [questions, setQuestions] = useState<QuestionFormData[]>(
-    initialData?.questions?.map(q => ({
+    initialData?.questions?.map((q) => ({
       questionText: q.questionText,
       maxPoints: q.maxPoints,
       evaluationCriteria: q.evaluationCriteria,
-      sampleAnswer: q.sampleAnswer || '',
+      sampleAnswer: q.sampleAnswer || "",
     })) || [{ ...emptyQuestion }]
   );
   const [rubricGuidelines, setRubricGuidelines] = useState<RubricGuidelines>(
@@ -61,7 +68,11 @@ export default function SchemaBuilder({ initialData, onSubmit, onCancel, isLoadi
     }
   };
 
-  const updateQuestion = (index: number, field: keyof QuestionFormData, value: string | number) => {
+  const updateQuestion = (
+    index: number,
+    field: keyof QuestionFormData,
+    value: string | number
+  ) => {
     const updated = [...questions];
     updated[index] = { ...updated[index], [field]: value };
     setQuestions(updated);
@@ -71,29 +82,29 @@ export default function SchemaBuilder({ initialData, onSubmit, onCancel, isLoadi
     const newErrors: Record<string, string> = {};
 
     if (!name.trim()) {
-      newErrors.name = 'Schema name is required';
+      newErrors.name = "Schema name is required";
     }
 
     questions.forEach((q, i) => {
       if (!q.questionText.trim()) {
-        newErrors[`question_${i}_text`] = 'Question text is required';
+        newErrors[`question_${i}_text`] = "Question text is required";
       }
       if (!q.evaluationCriteria.trim()) {
-        newErrors[`question_${i}_criteria`] = 'Evaluation criteria is required';
+        newErrors[`question_${i}_criteria`] = "Evaluation criteria is required";
       }
       if (q.maxPoints <= 0) {
-        newErrors[`question_${i}_points`] = 'Points must be greater than 0';
+        newErrors[`question_${i}_points`] = "Points must be greater than 0";
       }
     });
 
     if (!rubricGuidelines.fullCredit.trim()) {
-      newErrors.fullCredit = 'Full credit guidelines are required';
+      newErrors.fullCredit = "Full credit guidelines are required";
     }
     if (!rubricGuidelines.partialCredit.trim()) {
-      newErrors.partialCredit = 'Partial credit guidelines are required';
+      newErrors.partialCredit = "Partial credit guidelines are required";
     }
     if (!rubricGuidelines.noCredit.trim()) {
-      newErrors.noCredit = 'No credit guidelines are required';
+      newErrors.noCredit = "No credit guidelines are required";
     }
 
     setErrors(newErrors);
@@ -128,7 +139,9 @@ export default function SchemaBuilder({ initialData, onSubmit, onCancel, isLoadi
     <form onSubmit={handleSubmit} className="space-y-8">
       {/* Basic Info */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Schema Information</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          Schema Information
+        </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -139,14 +152,18 @@ export default function SchemaBuilder({ initialData, onSubmit, onCancel, isLoadi
               value={name}
               onChange={(e) => setName(e.target.value)}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.name ? 'border-red-500' : 'border-gray-300'
+                errors.name ? "border-red-500" : "border-gray-300"
               }`}
               placeholder="e.g., Software Engineering Test 2024"
             />
-            {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
+            {errors.name && (
+              <p className="text-red-500 text-sm mt-1">{errors.name}</p>
+            )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Version</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Version
+            </label>
             <input
               type="text"
               value={version}
@@ -156,7 +173,9 @@ export default function SchemaBuilder({ initialData, onSubmit, onCancel, isLoadi
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Description
+            </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -172,7 +191,10 @@ export default function SchemaBuilder({ initialData, onSubmit, onCancel, isLoadi
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-gray-900">
-            Questions <span className="text-sm font-normal text-gray-500">({questions.length} questions, {totalPoints} total points)</span>
+            Questions{" "}
+            <span className="text-sm font-normal text-gray-500">
+              ({questions.length} questions, {totalPoints} total points)
+            </span>
           </h3>
           <button
             type="button"
@@ -209,14 +231,20 @@ export default function SchemaBuilder({ initialData, onSubmit, onCancel, isLoadi
                   <input
                     type="text"
                     value={question.questionText}
-                    onChange={(e) => updateQuestion(index, 'questionText', e.target.value)}
+                    onChange={(e) =>
+                      updateQuestion(index, "questionText", e.target.value)
+                    }
                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      errors[`question_${index}_text`] ? 'border-red-500' : 'border-gray-300'
+                      errors[`question_${index}_text`]
+                        ? "border-red-500"
+                        : "border-gray-300"
                     }`}
                     placeholder="Enter the question text..."
                   />
                   {errors[`question_${index}_text`] && (
-                    <p className="text-red-500 text-sm mt-1">{errors[`question_${index}_text`]}</p>
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors[`question_${index}_text`]}
+                    </p>
                   )}
                 </div>
                 <div>
@@ -227,13 +255,23 @@ export default function SchemaBuilder({ initialData, onSubmit, onCancel, isLoadi
                     type="number"
                     min="1"
                     value={question.maxPoints}
-                    onChange={(e) => updateQuestion(index, 'maxPoints', parseInt(e.target.value) || 0)}
+                    onChange={(e) =>
+                      updateQuestion(
+                        index,
+                        "maxPoints",
+                        parseInt(e.target.value) || 0
+                      )
+                    }
                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      errors[`question_${index}_points`] ? 'border-red-500' : 'border-gray-300'
+                      errors[`question_${index}_points`]
+                        ? "border-red-500"
+                        : "border-gray-300"
                     }`}
                   />
                   {errors[`question_${index}_points`] && (
-                    <p className="text-red-500 text-sm mt-1">{errors[`question_${index}_points`]}</p>
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors[`question_${index}_points`]}
+                    </p>
                   )}
                 </div>
                 <div className="md:col-span-4">
@@ -242,24 +280,37 @@ export default function SchemaBuilder({ initialData, onSubmit, onCancel, isLoadi
                   </label>
                   <textarea
                     value={question.evaluationCriteria}
-                    onChange={(e) => updateQuestion(index, 'evaluationCriteria', e.target.value)}
+                    onChange={(e) =>
+                      updateQuestion(
+                        index,
+                        "evaluationCriteria",
+                        e.target.value
+                      )
+                    }
                     rows={2}
                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      errors[`question_${index}_criteria`] ? 'border-red-500' : 'border-gray-300'
+                      errors[`question_${index}_criteria`]
+                        ? "border-red-500"
+                        : "border-gray-300"
                     }`}
                     placeholder="What makes a good answer? Key points to look for..."
                   />
                   {errors[`question_${index}_criteria`] && (
-                    <p className="text-red-500 text-sm mt-1">{errors[`question_${index}_criteria`]}</p>
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors[`question_${index}_criteria`]}
+                    </p>
                   )}
                 </div>
                 <div className="md:col-span-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Sample Answer <span className="text-gray-400">(Optional)</span>
+                    Sample Answer{" "}
+                    <span className="text-gray-400">(Optional)</span>
                   </label>
                   <textarea
                     value={question.sampleAnswer}
-                    onChange={(e) => updateQuestion(index, 'sampleAnswer', e.target.value)}
+                    onChange={(e) =>
+                      updateQuestion(index, "sampleAnswer", e.target.value)
+                    }
                     rows={2}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Example of an ideal answer..."
@@ -273,7 +324,9 @@ export default function SchemaBuilder({ initialData, onSubmit, onCancel, isLoadi
 
       {/* Rubric Guidelines */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Rubric Guidelines</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          Rubric Guidelines
+        </h3>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -281,14 +334,21 @@ export default function SchemaBuilder({ initialData, onSubmit, onCancel, isLoadi
             </label>
             <textarea
               value={rubricGuidelines.fullCredit}
-              onChange={(e) => setRubricGuidelines({ ...rubricGuidelines, fullCredit: e.target.value })}
+              onChange={(e) =>
+                setRubricGuidelines({
+                  ...rubricGuidelines,
+                  fullCredit: e.target.value,
+                })
+              }
               rows={2}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.fullCredit ? 'border-red-500' : 'border-gray-300'
+                errors.fullCredit ? "border-red-500" : "border-gray-300"
               }`}
               placeholder="When should full credit be awarded?"
             />
-            {errors.fullCredit && <p className="text-red-500 text-sm mt-1">{errors.fullCredit}</p>}
+            {errors.fullCredit && (
+              <p className="text-red-500 text-sm mt-1">{errors.fullCredit}</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -296,14 +356,23 @@ export default function SchemaBuilder({ initialData, onSubmit, onCancel, isLoadi
             </label>
             <textarea
               value={rubricGuidelines.partialCredit}
-              onChange={(e) => setRubricGuidelines({ ...rubricGuidelines, partialCredit: e.target.value })}
+              onChange={(e) =>
+                setRubricGuidelines({
+                  ...rubricGuidelines,
+                  partialCredit: e.target.value,
+                })
+              }
               rows={2}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.partialCredit ? 'border-red-500' : 'border-gray-300'
+                errors.partialCredit ? "border-red-500" : "border-gray-300"
               }`}
               placeholder="When should partial credit be awarded?"
             />
-            {errors.partialCredit && <p className="text-red-500 text-sm mt-1">{errors.partialCredit}</p>}
+            {errors.partialCredit && (
+              <p className="text-red-500 text-sm mt-1">
+                {errors.partialCredit}
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -311,14 +380,21 @@ export default function SchemaBuilder({ initialData, onSubmit, onCancel, isLoadi
             </label>
             <textarea
               value={rubricGuidelines.noCredit}
-              onChange={(e) => setRubricGuidelines({ ...rubricGuidelines, noCredit: e.target.value })}
+              onChange={(e) =>
+                setRubricGuidelines({
+                  ...rubricGuidelines,
+                  noCredit: e.target.value,
+                })
+              }
               rows={2}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.noCredit ? 'border-red-500' : 'border-gray-300'
+                errors.noCredit ? "border-red-500" : "border-gray-300"
               }`}
               placeholder="When should no credit be given?"
             />
-            {errors.noCredit && <p className="text-red-500 text-sm mt-1">{errors.noCredit}</p>}
+            {errors.noCredit && (
+              <p className="text-red-500 text-sm mt-1">{errors.noCredit}</p>
+            )}
           </div>
         </div>
       </div>
@@ -338,7 +414,7 @@ export default function SchemaBuilder({ initialData, onSubmit, onCancel, isLoadi
           disabled={isLoading}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isLoading ? 'Saving...' : 'Save Schema'}
+          {isLoading ? "Saving..." : "Save Schema"}
         </button>
       </div>
     </form>

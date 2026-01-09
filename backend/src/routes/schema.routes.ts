@@ -6,9 +6,7 @@ const router = Router();
 // GET /api/schemas - List all scoring schemas
 router.get('/', async (_req: Request, res: Response) => {
   try {
-    const schemas = await ScoringSchema.find()
-      .select('name version description totalPoints createdAt updatedAt')
-      .sort({ updatedAt: -1 });
+    const schemas = await ScoringSchema.find().sort({ updatedAt: -1 });
     res.json({ schemas });
   } catch (error) {
     console.error('Error fetching schemas:', error);
