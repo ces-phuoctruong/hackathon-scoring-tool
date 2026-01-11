@@ -23,6 +23,12 @@ export interface ReviewUpdateData {
     points?: number;
     feedback?: string;
     flagForReview?: boolean;
+    criteriaBreakdown?: {
+      criterionText: string;
+      points: number;
+      maxPoints: number;
+      feedback?: string;
+    }[];
   }[];
   reviewNotes?: string;
   reviewedBy?: string;

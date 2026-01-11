@@ -32,6 +32,13 @@ export interface ScoringSchemaInput {
   rubricGuidelines: RubricGuidelines;
 }
 
+export interface CriterionScore {
+  criterionText: string;
+  points: number;
+  maxPoints: number;
+  feedback?: string;
+}
+
 export interface QuestionScore {
   questionNumber: number;
   points: number;
@@ -41,6 +48,7 @@ export interface QuestionScore {
   confidence: 'high' | 'medium' | 'low';
   flagForReview: boolean;
   manuallyAdjusted?: boolean;
+  criteriaBreakdown?: CriterionScore[];
 }
 
 export interface TestResult {
