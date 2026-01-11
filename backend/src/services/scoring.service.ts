@@ -1,10 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../config/index.js';
 import type { IQuestion } from '../models/index.js';
 
-const anthropic = new Anthropic({
-  apiKey: config.anthropicApiKey,
-});
+const genAI = new GoogleGenerativeAI(config.geminiApiKey);
 
 export interface ScoringResult {
   questionNumber: number;
@@ -56,6 +54,7 @@ Return your evaluation as valid JSON in this exact format:
 {
   "points": <number between 0 and ${question.maxPoints}>,
   "feedback": "<constructive feedback for the student, 1-3 sentences>",
+  "reasoning": "<your step-by-step reasoning for the score, 2-4 sentences>",
   "confidence": "<high|medium|low>",
   "flagForReview": <true if answer is ambiguous or needs human verification, false otherwise>
 }
@@ -77,35 +76,18 @@ export async function scoreAnswer(
   const prompt = buildScoringPrompt(question, studentAnswer, rubricGuidelines);
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 16000,
-      thinking: {
-        type: 'enabled',
-        budget_tokens: 10000,
-      },
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-    });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-    // Extract thinking and text blocks
-    let reasoning = '';
-    let resultText = '';
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const textContent = response.text();
 
-    for (const block of response.content) {
-      if (block.type === 'thinking') {
-        reasoning = block.thinking;
-      } else if (block.type === 'text') {
-        resultText = block.text;
-      }
+    if (!textContent) {
+      throw new Error('No text response from Gemini API');
     }
 
     // Parse the JSON result
-    let jsonText = resultText.trim();
+    let jsonText = textContent.trim();
     if (jsonText.startsWith('```json')) {
       jsonText = jsonText.slice(7);
     }
@@ -119,6 +101,7 @@ export async function scoreAnswer(
     const parsed = JSON.parse(jsonText.trim()) as {
       points: number;
       feedback: string;
+      reasoning: string;
       confidence: 'high' | 'medium' | 'low';
       flagForReview: boolean;
     };
@@ -131,7 +114,7 @@ export async function scoreAnswer(
       points,
       maxPoints: question.maxPoints,
       feedback: parsed.feedback || 'No feedback provided',
-      reasoning,
+      reasoning: parsed.reasoning || 'No reasoning provided',
       confidence: parsed.confidence || 'medium',
       flagForReview: parsed.flagForReview ?? false,
     };

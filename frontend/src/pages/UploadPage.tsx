@@ -62,7 +62,7 @@ export default function UploadPage() {
       }
       setTestId(uploadedTestId);
 
-      // Step 2: Process with Claude Vision
+      // Step 2: Process with Gemini Vision
       const processResponse = await testApi.process(uploadedTestId);
       setExtractedText(processResponse.data.test.extractedText || '');
 
@@ -239,7 +239,7 @@ export default function UploadPage() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Processing Test Papers</h2>
           <p className="text-gray-500">
-            Using Claude Vision to extract text from your uploaded images...
+            Using Gemini Vision to extract text from your uploaded images...
           </p>
           <p className="text-sm text-gray-400 mt-2">This may take a minute or two.</p>
         </div>
