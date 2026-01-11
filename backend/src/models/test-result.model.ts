@@ -27,7 +27,11 @@ export interface ITestResult extends Document {
   scores: IQuestionScore[];
   totalScore: number;
   maxScore: number;
-  status: 'pending' | 'processing' | 'extracted' | 'scored' | 'reviewed';
+  status: 'pending' | 'processing' | 'extracted' | 'scored' | 'reviewed' | 'error';
+  errorMessage?: string;
+  errorAt?: Date;
+  processingStartedAt?: Date;
+  scoringStartedAt?: Date;
   reviewNotes?: string;
   reviewedBy?: string;
   reviewedAt?: Date;
@@ -63,9 +67,13 @@ const TestResultSchema = new Schema<ITestResult>(
     maxScore: { type: Number, default: 0 },
     status: {
       type: String,
-      enum: ['pending', 'processing', 'extracted', 'scored', 'reviewed'],
+      enum: ['pending', 'processing', 'extracted', 'scored', 'reviewed', 'error'],
       default: 'pending',
     },
+    errorMessage: { type: String },
+    errorAt: { type: Date },
+    processingStartedAt: { type: Date },
+    scoringStartedAt: { type: Date },
     reviewNotes: { type: String },
     reviewedBy: { type: String },
     reviewedAt: { type: Date },

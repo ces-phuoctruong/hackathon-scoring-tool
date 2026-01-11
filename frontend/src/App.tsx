@@ -3,6 +3,7 @@ import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
 import SchemaBuilderPage from './pages/SchemaBuilderPage';
 import UploadPage from './pages/UploadPage';
+import ProcessingQueuePage from './pages/ProcessingQueuePage';
 import ReviewPage from './pages/ReviewPage';
 
 function App() {
@@ -12,6 +13,7 @@ function App() {
         <Route index element={<HomePage />} />
         <Route path="schemas" element={<SchemaBuilderPage />} />
         <Route path="upload" element={<UploadPage />} />
+        <Route path="queue" element={<ProcessingQueuePage />} />
         <Route path="review" element={<ReviewPage />} />
         <Route path="review/:id" element={<ReviewPage />} />
       </Route>

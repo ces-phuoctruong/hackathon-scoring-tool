@@ -1,22 +1,25 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import FileUpload from '../components/FileUpload';
-import { schemaApi, testApi } from '../services/api';
-import type { ScoringSchema } from '../types';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import FileUpload from "../components/FileUpload";
+import { schemaApi, testApi } from "../services/api";
+import type { ScoringSchema } from "../types";
 
-type UploadStep = 'select-schema' | 'upload-files' | 'processing' | 'complete';
+type UploadStep = "select-schema" | "upload-files" | "uploading" | "complete";
 
 export default function UploadPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<UploadStep>('select-schema');
+  const [step, setStep] = useState<UploadStep>("select-schema");
   const [schemas, setSchemas] = useState<ScoringSchema[]>([]);
-  const [selectedSchema, setSelectedSchema] = useState<ScoringSchema | null>(null);
-  const [candidateName, setCandidateName] = useState('');
+  const [selectedSchema, setSelectedSchema] = useState<ScoringSchema | null>(
+    null
+  );
+  const [candidateName, setCandidateName] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [testId, setTestId] = useState<string | null>(null);
-  const [extractedText, setExtractedText] = useState<string>('');
+  const [uploadedCount, setUploadedCount] = useState(0);
+  const [startProcessingAfterUpload, setStartProcessingAfterUpload] =
+    useState(false);
 
   useEffect(() => {
     fetchSchemas();
@@ -27,69 +30,68 @@ export default function UploadPage() {
       const response = await schemaApi.getAll();
       setSchemas(response.data.schemas);
     } catch (err) {
-      console.error('Error fetching schemas:', err);
-      setError('Failed to load schemas');
+      console.error("Error fetching schemas:", err);
+      setError("Failed to load schemas");
     }
   };
 
   const handleSchemaSelect = (schema: ScoringSchema) => {
     setSelectedSchema(schema);
-    setStep('upload-files');
+    setStep("upload-files");
   };
 
   const handleFilesSelected = (selectedFiles: File[]) => {
     setFiles(selectedFiles);
   };
 
-  const handleUploadAndProcess = async () => {
+  const handleUpload = async () => {
     if (!selectedSchema || files.length === 0) return;
 
     setIsLoading(true);
     setError(null);
-    setStep('processing');
+    setStep("uploading");
 
     try {
-      // Step 1: Upload files
+      // Single test upload
       const uploadResponse = await testApi.upload(
         files,
         selectedSchema._id,
         candidateName || undefined
       );
 
-      const uploadedTestId = uploadResponse.data.test._id;
-      if (!uploadedTestId) {
-        throw new Error('No test ID returned from upload');
+      const testId = uploadResponse.data.test._id;
+      if (!testId) {
+        throw new Error("No test ID returned from upload");
       }
-      setTestId(uploadedTestId);
 
-      // Step 2: Process with Gemini Vision
-      const processResponse = await testApi.process(uploadedTestId);
-      setExtractedText(processResponse.data.test.extractedText || '');
+      // Optionally start processing
+      if (startProcessingAfterUpload) {
+        await testApi.processAsync(testId);
+      }
 
-      setStep('complete');
+      setUploadedCount(1);
+
+      setStep("complete");
     } catch (err) {
-      console.error('Error processing test:', err);
-      setError('Failed to process test. Please try again.');
-      setStep('upload-files');
+      console.error("Error uploading:", err);
+      setError("Failed to upload. Please try again.");
+      setStep("upload-files");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleStartOver = () => {
-    setStep('select-schema');
+    setStep("select-schema");
     setSelectedSchema(null);
-    setCandidateName('');
+    setCandidateName("");
     setFiles([]);
-    setTestId(null);
-    setExtractedText('');
+    setUploadedCount(0);
     setError(null);
   };
 
-  const handleProceedToScoring = () => {
-    if (testId) {
-      navigate(`/review/${testId}`);
-    }
+  const handleGoToQueue = () => {
+    navigate("/queue");
   };
 
   return (
@@ -97,41 +99,49 @@ export default function UploadPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Upload Test Papers</h1>
         <p className="text-gray-600 mt-1">
-          Upload images of test papers for AI-powered text extraction and scoring.
+          Upload images of test papers for AI-powered text extraction and
+          scoring.
         </p>
       </div>
 
       {/* Progress Steps */}
       <div className="flex items-center justify-center space-x-4">
-        {['Select Schema', 'Upload Files', 'Processing', 'Complete'].map((label, index) => {
-          const stepIndex = ['select-schema', 'upload-files', 'processing', 'complete'].indexOf(step);
-          const isActive = index === stepIndex;
-          const isCompleted = index < stepIndex;
+        {["Select Schema", "Upload Files", "Uploading", "Complete"].map(
+          (label, index) => {
+            const stepIndex = [
+              "select-schema",
+              "upload-files",
+              "uploading",
+              "complete",
+            ].indexOf(step);
+            const isActive = index === stepIndex;
+            const isCompleted = index < stepIndex;
 
-          return (
-            <div key={label} className="flex items-center">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  isActive
-                    ? 'bg-blue-600 text-white'
-                    : isCompleted
-                    ? 'bg-green-500 text-white'
-                    : 'bg-gray-200 text-gray-600'
-                }`}
-              >
-                {isCompleted ? '✓' : index + 1}
+            return (
+              <div key={label} className="flex items-center">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                    isActive
+                      ? "bg-blue-600 text-white"
+                      : isCompleted
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200 text-gray-600"
+                  }`}
+                >
+                  {isCompleted ? "✓" : index + 1}
+                </div>
+                <span
+                  className={`ml-2 text-sm ${
+                    isActive ? "text-blue-600 font-medium" : "text-gray-500"
+                  }`}
+                >
+                  {label}
+                </span>
+                {index < 3 && <div className="w-12 h-0.5 bg-gray-200 mx-4" />}
               </div>
-              <span
-                className={`ml-2 text-sm ${
-                  isActive ? 'text-blue-600 font-medium' : 'text-gray-500'
-                }`}
-              >
-                {label}
-              </span>
-              {index < 3 && <div className="w-12 h-0.5 bg-gray-200 mx-4" />}
-            </div>
-          );
-        })}
+            );
+          }
+        )}
       </div>
 
       {error && (
@@ -141,14 +151,18 @@ export default function UploadPage() {
       )}
 
       {/* Step 1: Select Schema */}
-      {step === 'select-schema' && (
+      {step === "select-schema" && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Select a Scoring Schema</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Select a Scoring Schema
+          </h2>
           {schemas.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-500 mb-4">No schemas available. Create a schema first.</p>
+              <p className="text-gray-500 mb-4">
+                No schemas available. Create a schema first.
+              </p>
               <button
-                onClick={() => navigate('/schemas')}
+                onClick={() => navigate("/schemas")}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
               >
                 Create Schema
@@ -164,13 +178,17 @@ export default function UploadPage() {
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-medium text-gray-900">{schema.name}</h3>
+                      <h3 className="font-medium text-gray-900">
+                        {schema.name}
+                      </h3>
                       {schema.description && (
-                        <p className="text-sm text-gray-500 mt-1">{schema.description}</p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {schema.description}
+                        </p>
                       )}
                     </div>
                     <span className="text-sm text-gray-500">
-                      {schema.totalPoints} pts • v{schema.version}
+                      {schema.totalPoints} pts - v{schema.version}
                     </span>
                   </div>
                 </button>
@@ -181,24 +199,43 @@ export default function UploadPage() {
       )}
 
       {/* Step 2: Upload Files */}
-      {step === 'upload-files' && selectedSchema && (
+      {step === "upload-files" && selectedSchema && (
         <div className="space-y-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex justify-between items-start mb-4">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Upload Test Papers</h2>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Upload Test Papers
+                </h2>
                 <p className="text-sm text-gray-500 mt-1">
-                  Using schema: <span className="font-medium">{selectedSchema.name}</span>
+                  Using schema:{" "}
+                  <span className="font-medium">{selectedSchema.name}</span>
                 </p>
               </div>
               <button
-                onClick={() => setStep('select-schema')}
+                onClick={() => setStep("select-schema")}
                 className="text-sm text-blue-600 hover:text-blue-800"
               >
                 Change Schema
               </button>
             </div>
 
+            {/* Upload Mode Toggle */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Upload Mode
+              </label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span className="text-sm text-gray-700">Single Test</span>
+                  <span className="text-xs text-gray-500">
+                    (All images for one candidate)
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* Single Test: Candidate Name */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Candidate Name <span className="text-gray-400">(Optional)</span>
@@ -212,7 +249,32 @@ export default function UploadPage() {
               />
             </div>
 
-            <FileUpload onFilesSelected={handleFilesSelected} disabled={isLoading} />
+            <FileUpload
+              onFilesSelected={handleFilesSelected}
+              disabled={isLoading}
+            />
+
+            {/* Start Processing Option */}
+            {files.length > 0 && (
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={startProcessingAfterUpload}
+                    onChange={(e) =>
+                      setStartProcessingAfterUpload(e.target.checked)
+                    }
+                    className="rounded text-blue-600"
+                  />
+                  <span className="text-sm text-gray-700">
+                    Start processing automatically after upload
+                  </span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1 ml-6">
+                  If unchecked, you can start processing from the Queue page.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-3">
@@ -223,66 +285,72 @@ export default function UploadPage() {
               Cancel
             </button>
             <button
-              onClick={handleUploadAndProcess}
+              onClick={handleUpload}
               disabled={files.length === 0 || isLoading}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Upload & Process
+              Upload Test
             </button>
           </div>
         </div>
       )}
 
-      {/* Step 3: Processing */}
-      {step === 'processing' && (
+      {/* Step 3: Uploading */}
+      {step === "uploading" && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Processing Test Papers</h2>
-          <p className="text-gray-500">
-            Using Gemini Vision to extract text from your uploaded images...
-          </p>
-          <p className="text-sm text-gray-400 mt-2">This may take a minute or two.</p>
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">
+            Uploading Test Papers
+          </h2>
+          <p className="text-gray-500">Uploading your test paper...</p>
+          {startProcessingAfterUpload && (
+            <p className="text-sm text-gray-400 mt-2">
+              Processing will start automatically.
+            </p>
+          )}
         </div>
       )}
 
       {/* Step 4: Complete */}
-      {step === 'complete' && (
+      {step === "complete" && (
         <div className="space-y-6">
           <div className="bg-green-50 border border-green-200 rounded-lg p-6">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">
                 ✓
               </div>
-              <h2 className="text-lg font-semibold text-green-800">Text Extraction Complete</h2>
+              <h2 className="text-lg font-semibold text-green-800">
+                Upload Complete
+              </h2>
             </div>
             <p className="text-green-700">
-              Successfully extracted text from {files.length} image{files.length !== 1 ? 's' : ''}.
+              Successfully uploaded {uploadedCount} test
+              {uploadedCount !== 1 ? "s" : ""}.
+              {startProcessingAfterUpload && " Processing has started."}
             </p>
           </div>
 
-          {extractedText && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Extracted Text Preview</h3>
-              <div className="bg-gray-50 rounded-md p-4 max-h-64 overflow-y-auto">
-                <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
-                  {extractedText}
-                </pre>
-              </div>
-            </div>
-          )}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h3 className="font-medium text-blue-800 mb-2">What's Next?</h3>
+            <p className="text-blue-700 text-sm mb-4">
+              {startProcessingAfterUpload
+                ? "Your tests are being processed in the background. You can monitor progress and start scoring from the Processing Queue."
+                : "Your tests have been uploaded and are ready for processing. Go to the Processing Queue to start text extraction."}
+            </p>
+            <button
+              onClick={handleGoToQueue}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Go to Processing Queue
+            </button>
+          </div>
 
-          <div className="flex justify-end gap-3">
+          <div className="flex justify-end">
             <button
               onClick={handleStartOver}
               className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
             >
-              Upload Another
-            </button>
-            <button
-              onClick={handleProceedToScoring}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Proceed to Scoring
+              Upload More Tests
             </button>
           </div>
         </div>

@@ -54,10 +54,41 @@ export interface TestResult {
   scores: QuestionScore[];
   totalScore: number;
   maxScore: number;
-  status: 'pending' | 'processing' | 'extracted' | 'scored' | 'reviewed';
+  status: 'pending' | 'processing' | 'extracted' | 'scored' | 'reviewed' | 'error';
+  errorMessage?: string;
+  errorAt?: string;
+  processingStartedAt?: string;
+  scoringStartedAt?: string;
   reviewNotes?: string;
   reviewedAt?: string;
   reviewedBy?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TestStatusResponse {
+  _id: string;
+  status: TestResult['status'];
+  errorMessage?: string;
+  processingStartedAt?: string;
+  scoringStartedAt?: string;
+  updatedAt: string;
+}
+
+export interface BatchUploadResult {
+  _id: string;
+  status: string;
+  candidateName?: string;
+  imageCount: number;
+}
+
+export interface ReviewUpdateData {
+  scores?: Array<{
+    questionNumber: number;
+    points?: number;
+    feedback?: string;
+    flagForReview?: boolean;
+  }>;
+  reviewNotes?: string;
+  reviewedBy?: string;
 }
