@@ -228,8 +228,8 @@ export default function SchemaBuilder({
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Question Text <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
+                  <textarea
+                    rows={5}
                     value={question.questionText}
                     onChange={(e) =>
                       updateQuestion(index, "questionText", e.target.value)
@@ -287,7 +287,7 @@ export default function SchemaBuilder({
                         e.target.value
                       )
                     }
-                    rows={2}
+                    rows={5}
                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                       errors[`question_${index}_criteria`]
                         ? "border-red-500"
@@ -311,7 +311,7 @@ export default function SchemaBuilder({
                     onChange={(e) =>
                       updateQuestion(index, "sampleAnswer", e.target.value)
                     }
-                    rows={2}
+                    rows={5}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Example of an ideal answer..."
                   />
@@ -340,7 +340,7 @@ export default function SchemaBuilder({
                   fullCredit: e.target.value,
                 })
               }
-              rows={2}
+              rows={5}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 errors.fullCredit ? "border-red-500" : "border-gray-300"
               }`}
@@ -362,7 +362,7 @@ export default function SchemaBuilder({
                   partialCredit: e.target.value,
                 })
               }
-              rows={2}
+              rows={5}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 errors.partialCredit ? "border-red-500" : "border-gray-300"
               }`}
@@ -386,7 +386,7 @@ export default function SchemaBuilder({
                   noCredit: e.target.value,
                 })
               }
-              rows={2}
+              rows={5}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 errors.noCredit ? "border-red-500" : "border-gray-300"
               }`}

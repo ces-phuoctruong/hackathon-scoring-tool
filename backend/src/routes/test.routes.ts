@@ -3,6 +3,10 @@ import { upload } from "../config/upload.js";
 import { TestResult, ScoringSchema } from "../models/index.js";
 import { extractTextFromMultipleImages } from "../services/gemini-vision.service.js";
 import { scoreAllAnswersParallel } from "../services/scoring.service.js";
+import {
+  processTestInBackground,
+  scoreTestInBackground,
+} from "../services/background-processor.js";
 
 const router = Router();
 
@@ -58,6 +62,103 @@ router.post(
   }
 );
 
+// GET /api/tests/status - Lightweight status check for polling
+router.get("/status", async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.query;
+
+    if (!ids || typeof ids !== "string") {
+      res.status(400).json({ error: "Test IDs are required" });
+      return;
+    }
+
+    const testIds = ids.split(",").map((id) => id.trim());
+
+    const tests = await TestResult.find({ _id: { $in: testIds } })
+      .select(
+        "_id status errorMessage processingStartedAt scoringStartedAt updatedAt"
+      )
+      .lean();
+
+    res.json({ tests });
+  } catch (error) {
+    console.error("Error fetching test statuses:", error);
+    res.status(500).json({ error: "Failed to fetch statuses" });
+  }
+});
+
+// POST /api/tests/batch/process - Start processing for multiple tests
+router.post("/batch/process", async (req: Request, res: Response) => {
+  try {
+    const { testIds } = req.body;
+
+    if (!testIds || !Array.isArray(testIds)) {
+      res.status(400).json({ error: "Test IDs array is required" });
+      return;
+    }
+
+    const results = [];
+
+    for (const testId of testIds) {
+      const testResult = await TestResult.findById(testId);
+
+      if (!testResult || testResult.status !== "pending") {
+        results.push({ _id: testId, started: false, reason: "Not eligible" });
+        continue;
+      }
+
+      testResult.status = "processing";
+      testResult.processingStartedAt = new Date();
+      await testResult.save();
+
+      // Fire and forget - don't await
+      processTestInBackground(testId);
+      results.push({ _id: testId, started: true });
+    }
+
+    res.json({ results });
+  } catch (error) {
+    console.error("Error starting batch processing:", error);
+    res.status(500).json({ error: "Failed to start batch processing" });
+  }
+});
+
+// POST /api/tests/batch/score - Start scoring for multiple tests
+router.post("/batch/score", async (req: Request, res: Response) => {
+  try {
+    const { testIds } = req.body;
+
+    if (!testIds || !Array.isArray(testIds)) {
+      res.status(400).json({ error: "Test IDs array is required" });
+      return;
+    }
+
+    const results = [];
+
+    for (const testId of testIds) {
+      const testResult = await TestResult.findById(testId);
+
+      if (!testResult || testResult.status !== "extracted") {
+        results.push({ _id: testId, started: false, reason: "Not eligible" });
+        continue;
+      }
+
+      testResult.status = "processing";
+      testResult.scoringStartedAt = new Date();
+      await testResult.save();
+
+      // Fire and forget - don't await
+      scoreTestInBackground(testId);
+      results.push({ _id: testId, started: true });
+    }
+
+    res.json({ results });
+  } catch (error) {
+    console.error("Error starting batch scoring:", error);
+    res.status(500).json({ error: "Failed to start batch scoring" });
+  }
+});
+
 // POST /api/tests/:id/process - Process uploaded test with Claude Vision
 router.post("/:id/process", async (req: Request, res: Response) => {
   try {
@@ -73,14 +174,29 @@ router.post("/:id/process", async (req: Request, res: Response) => {
       return;
     }
 
+    // Fetch the schema to get question definitions
+    const schema = await ScoringSchema.findById(testResult.schemaId);
+    if (!schema) {
+      res.status(400).json({ error: "Schema not found for this test" });
+      return;
+    }
+
     // Update status to processing
     testResult.status = "processing";
     await testResult.save();
 
     try {
-      // Extract text from images using Claude Vision
+      // Prepare schema questions for extraction
+      const schemaQuestions = schema.questions.map((q) => ({
+        questionNumber: q.questionNumber,
+        questionText: q.questionText,
+        maxPoints: q.maxPoints,
+      }));
+
+      // Extract text from images using Gemini Vision with schema context
       const extracted = await extractTextFromMultipleImages(
-        testResult.originalImages
+        testResult.originalImages,
+        schemaQuestions
       );
 
       // Update test result with extracted content
@@ -135,6 +251,15 @@ router.post("/:id/score", async (req: Request, res: Response) => {
       return;
     }
 
+    // Accept edited answers from frontend if provided
+    const { extractedAnswers } = req.body;
+    if (extractedAnswers && Array.isArray(extractedAnswers)) {
+      testResult.extractedAnswers = extractedAnswers.map((a: { questionNumber: number; studentAnswer: string }) => ({
+        questionNumber: a.questionNumber,
+        studentAnswer: a.studentAnswer,
+      }));
+    }
+
     // Update status to processing
     testResult.status = "processing";
     await testResult.save();
@@ -183,6 +308,116 @@ router.post("/:id/score", async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/tests/:id/process/async - Start background text extraction (non-blocking)
+router.post("/:id/process/async", async (req: Request, res: Response) => {
+  try {
+    const testResult = await TestResult.findById(req.params.id);
+
+    if (!testResult) {
+      res.status(404).json({ error: "Test not found" });
+      return;
+    }
+
+    if (testResult.status !== "pending") {
+      res.status(400).json({ error: "Test has already been processed" });
+      return;
+    }
+
+    // Update status immediately
+    testResult.status = "processing";
+    testResult.processingStartedAt = new Date();
+    await testResult.save();
+
+    // Return immediately
+    res.json({
+      test: { _id: testResult._id, status: "processing" },
+      message: "Processing started",
+    });
+
+    // Process in background (fire-and-forget)
+    processTestInBackground(testResult._id.toString());
+  } catch (error) {
+    console.error("Error starting processing:", error);
+    res.status(500).json({ error: "Failed to start processing" });
+  }
+});
+
+// POST /api/tests/:id/score/async - Start background scoring (non-blocking)
+router.post("/:id/score/async", async (req: Request, res: Response) => {
+  try {
+    const testResult = await TestResult.findById(req.params.id);
+
+    if (!testResult) {
+      res.status(404).json({ error: "Test not found" });
+      return;
+    }
+
+    if (testResult.status !== "extracted") {
+      res.status(400).json({ error: "Test must be extracted before scoring" });
+      return;
+    }
+
+    // Update status immediately
+    testResult.status = "processing";
+    testResult.scoringStartedAt = new Date();
+    await testResult.save();
+
+    // Return immediately
+    res.json({
+      test: { _id: testResult._id, status: "processing" },
+      message: "Scoring started",
+    });
+
+    // Score in background (fire-and-forget)
+    scoreTestInBackground(testResult._id.toString());
+  } catch (error) {
+    console.error("Error starting scoring:", error);
+    res.status(500).json({ error: "Failed to start scoring" });
+  }
+});
+
+// POST /api/tests/:id/retry - Retry a failed test
+router.post("/:id/retry", async (req: Request, res: Response) => {
+  try {
+    const testResult = await TestResult.findById(req.params.id);
+
+    if (!testResult) {
+      res.status(404).json({ error: "Test not found" });
+      return;
+    }
+
+    if (testResult.status !== "error") {
+      res.status(400).json({ error: "Test is not in error state" });
+      return;
+    }
+
+    // Determine what to retry based on previous state
+    const hasExtractedText =
+      testResult.extractedText && testResult.extractedText.length > 0;
+
+    if (hasExtractedText) {
+      // Was scoring that failed, retry scoring
+      testResult.status = "processing";
+      testResult.errorMessage = undefined;
+      testResult.scoringStartedAt = new Date();
+      await testResult.save();
+      scoreTestInBackground(testResult._id.toString());
+    } else {
+      // Was extraction that failed, retry extraction
+      testResult.status = "processing";
+      testResult.errorMessage = undefined;
+      testResult.processingStartedAt = new Date();
+      await testResult.save();
+      processTestInBackground(testResult._id.toString());
+    }
+
+    res.json({ test: { _id: testResult._id, status: "processing" } });
+  } catch (error) {
+    console.error("Error retrying test:", error);
+    res.status(500).json({ error: "Failed to retry test" });
+  }
+});
+
 // GET /api/tests - List all test results
 router.get("/", async (req: Request, res: Response) => {
   try {
@@ -196,13 +431,64 @@ router.get("/", async (req: Request, res: Response) => {
       .select(
         "candidateName status totalScore maxScore createdAt updatedAt schemaId"
       )
-      .populate("schemaId", "name version")
+      .populate("scoringSchema", "name version")
       .sort({ createdAt: -1 });
 
     res.json({ tests });
   } catch (error) {
     console.error("Error fetching tests:", error);
     res.status(500).json({ error: "Failed to fetch tests" });
+  }
+});
+
+// PATCH /api/tests/:id/extracted-text - Update extracted text and answers before scoring
+router.patch("/:id/extracted-text", async (req: Request, res: Response) => {
+  try {
+    const testResult = await TestResult.findById(req.params.id);
+
+    if (!testResult) {
+      res.status(404).json({ error: "Test not found" });
+      return;
+    }
+
+    if (testResult.status !== "extracted") {
+      res.status(400).json({ error: "Can only edit extracted text before scoring" });
+      return;
+    }
+
+    const { extractedText, extractedAnswers } = req.body;
+
+    if (extractedText !== undefined) {
+      if (typeof extractedText !== "string") {
+        res.status(400).json({ error: "extractedText must be a string" });
+        return;
+      }
+      testResult.extractedText = extractedText;
+    }
+
+    if (extractedAnswers !== undefined) {
+      if (!Array.isArray(extractedAnswers)) {
+        res.status(400).json({ error: "extractedAnswers must be an array" });
+        return;
+      }
+      testResult.extractedAnswers = extractedAnswers.map((a: { questionNumber: number; studentAnswer: string }) => ({
+        questionNumber: a.questionNumber,
+        studentAnswer: a.studentAnswer,
+      }));
+    }
+
+    await testResult.save();
+
+    res.json({
+      test: {
+        _id: testResult._id,
+        extractedText: testResult.extractedText,
+        extractedAnswers: testResult.extractedAnswers,
+      },
+    });
+  } catch (error) {
+    console.error("Error updating extracted text:", error);
+    res.status(500).json({ error: "Failed to update extracted text" });
   }
 });
 

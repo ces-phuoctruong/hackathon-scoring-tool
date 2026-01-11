@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { testApi, type ReviewUpdateData } from '../services/api';
-import type { TestResult, ScoringSchema, QuestionScore } from '../types';
+import dayjs from 'dayjs';
+import { testApi } from '../services/api';
+import type { TestResult, ScoringSchema, QuestionScore, ReviewUpdateData } from '../types';
 
 type TestWithSchema = TestResult & { scoringSchema: ScoringSchema };
 
@@ -18,6 +19,10 @@ export default function ReviewPage() {
   const [editedScores, setEditedScores] = useState<Record<number, { points: number; feedback: string }>>({});
   const [reviewNotes, setReviewNotes] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  const [isEditingExtractedText, setIsEditingExtractedText] = useState(false);
+  const [editedExtractedText, setEditedExtractedText] = useState('');
+  const [editedAnswers, setEditedAnswers] = useState<{ questionNumber: number; studentAnswer: string }[]>([]);
+  const [isSavingExtractedText, setIsSavingExtractedText] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -34,6 +39,8 @@ export default function ReviewPage() {
       const testData = response.data.test as TestWithSchema;
       setTest(testData);
       setReviewNotes(testData.reviewNotes || '');
+      setEditedExtractedText(testData.extractedText || '');
+      setEditedAnswers(testData.extractedAnswers || []);
       setError(null);
     } catch (err) {
       console.error('Error fetching test:', err);
@@ -43,6 +50,47 @@ export default function ReviewPage() {
     }
   };
 
+  const handleSaveExtractedText = async () => {
+    if (!test) return;
+
+    setIsSavingExtractedText(true);
+    setError(null);
+
+    try {
+      await testApi.updateExtractedText(test._id, {
+        extractedText: editedExtractedText,
+        extractedAnswers: editedAnswers,
+      });
+      await fetchTest(test._id);
+      setIsEditingExtractedText(false);
+    } catch (err) {
+      console.error('Error saving extracted text:', err);
+      setError('Failed to save extracted text. Please try again.');
+    } finally {
+      setIsSavingExtractedText(false);
+    }
+  };
+
+  const handleStartEditingExtractedText = () => {
+    setEditedExtractedText(test?.extractedText || '');
+    setEditedAnswers(test?.extractedAnswers || []);
+    setIsEditingExtractedText(true);
+  };
+
+  const handleCancelEditingExtractedText = () => {
+    setEditedExtractedText(test?.extractedText || '');
+    setEditedAnswers(test?.extractedAnswers || []);
+    setIsEditingExtractedText(false);
+  };
+
+  const handleAnswerChange = (questionNumber: number, studentAnswer: string) => {
+    setEditedAnswers((prev) =>
+      prev.map((a) =>
+        a.questionNumber === questionNumber ? { ...a, studentAnswer } : a
+      )
+    );
+  };
+
   const handleStartScoring = async () => {
     if (!test) return;
 
@@ -50,7 +98,8 @@ export default function ReviewPage() {
     setError(null);
 
     try {
-      await testApi.score(test._id);
+      // Pass current edited answers to ensure latest data is used for scoring
+      await testApi.score(test._id, editedAnswers);
       await fetchTest(test._id);
     } catch (err) {
       console.error('Error scoring test:', err);
@@ -129,12 +178,13 @@ export default function ReviewPage() {
   };
 
   const getStatusBadge = (status: TestResult['status']) => {
-    const styles = {
+    const styles: Record<TestResult['status'], string> = {
       pending: 'bg-gray-100 text-gray-800',
       processing: 'bg-blue-100 text-blue-800',
       extracted: 'bg-yellow-100 text-yellow-800',
       scored: 'bg-green-100 text-green-800',
       reviewed: 'bg-purple-100 text-purple-800',
+      error: 'bg-red-100 text-red-800',
     };
     return (
       <span className={`px-2.5 py-1 rounded-full text-sm font-medium ${styles[status]}`}>
@@ -255,11 +305,11 @@ export default function ReviewPage() {
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
           <h2 className="text-lg font-semibold text-yellow-800 mb-2">Ready for Scoring</h2>
           <p className="text-yellow-700 mb-4">
-            Text has been extracted. Click the button below to score the answers using AI.
+            Text has been extracted. Review the answers below and edit if needed, then start AI scoring.
           </p>
           <button
             onClick={handleStartScoring}
-            disabled={isScoring}
+            disabled={isScoring || isEditingExtractedText}
             className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 disabled:opacity-50"
           >
             {isScoring ? 'Scoring in progress...' : 'Start AI Scoring'}
@@ -289,7 +339,7 @@ export default function ReviewPage() {
           />
           {test.reviewedAt && (
             <p className="text-sm text-gray-500 mt-2">
-              Last reviewed: {new Date(test.reviewedAt).toLocaleString()}
+              Last reviewed: {dayjs(test.reviewedAt).format("DD-MM-YYYY HH:mm:ss")}
               {test.reviewedBy && ` by ${test.reviewedBy}`}
             </p>
           )}
@@ -299,8 +349,37 @@ export default function ReviewPage() {
       {/* Extracted Answers */}
       {test.extractedAnswers.length > 0 && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-lg font-semibold text-gray-900">Answers & Scores</h2>
+            {test.status === 'extracted' && (
+              <div className="flex items-center gap-3">
+                {isEditingExtractedText ? (
+                  <>
+                    <button
+                      onClick={handleCancelEditingExtractedText}
+                      disabled={isSavingExtractedText}
+                      className="px-3 py-1.5 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveExtractedText}
+                      disabled={isSavingExtractedText}
+                      className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {isSavingExtractedText ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={handleStartEditingExtractedText}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  >
+                    Edit Answers
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           <div className="divide-y divide-gray-200">
             {test.extractedAnswers.map((answer) => {
@@ -362,9 +441,19 @@ export default function ReviewPage() {
                   <div className="ml-11 space-y-3">
                     <div>
                       <p className="text-sm font-medium text-gray-500 mb-1">Student Answer:</p>
-                      <p className="text-gray-700 bg-gray-50 p-3 rounded-md">
-                        {answer.studentAnswer || '(No answer provided)'}
-                      </p>
+                      {isEditingExtractedText && test.status === 'extracted' ? (
+                        <textarea
+                          value={editedAnswers.find((a) => a.questionNumber === answer.questionNumber)?.studentAnswer || ''}
+                          onChange={(e) => handleAnswerChange(answer.questionNumber, e.target.value)}
+                          rows={15}
+                          className="w-full p-3 bg-gray-50 rounded-md text-gray-700 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
+                          placeholder="Enter student answer..."
+                        />
+                      ) : (
+                        <p className="text-gray-700 bg-gray-50 p-3 rounded-md whitespace-pre-wrap">
+                          {answer.studentAnswer || '(No answer provided)'}
+                        </p>
+                      )}
                     </div>
 
                     {score && (
@@ -454,18 +543,19 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {/* Extracted Text (collapsible) */}
+      {/* Extracted Text (read-only) */}
       {test.extractedText && (
-        <details className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <summary className="px-6 py-4 cursor-pointer hover:bg-gray-50">
-            <span className="text-lg font-semibold text-gray-900">Raw Extracted Text</span>
-          </summary>
-          <div className="px-6 pb-6">
-            <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-4 rounded-md max-h-96 overflow-y-auto">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">Raw Extracted Text</h2>
+            <p className="text-sm text-gray-500 mt-1">Original text extracted from uploaded images</p>
+          </div>
+          <div className="px-6 py-4">
+            <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-4 rounded-md max-h-[500px] overflow-y-auto">
               {test.extractedText}
             </pre>
           </div>
-        </details>
+        </div>
       )}
     </div>
   );
@@ -515,12 +605,13 @@ function TestListView() {
   };
 
   const getStatusBadge = (status: TestResult['status']) => {
-    const styles = {
+    const styles: Record<TestResult['status'], string> = {
       pending: 'bg-gray-100 text-gray-800',
       processing: 'bg-blue-100 text-blue-800',
       extracted: 'bg-yellow-100 text-yellow-800',
       scored: 'bg-green-100 text-green-800',
       reviewed: 'bg-purple-100 text-purple-800',
+      error: 'bg-red-100 text-red-800',
     };
     return (
       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${styles[status]}`}>
@@ -618,7 +709,7 @@ function TestListView() {
                         : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(test.createdAt).toLocaleDateString()}
+                      {dayjs(test.createdAt).format("DD-MM-YYYY HH:mm:ss")}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <button
