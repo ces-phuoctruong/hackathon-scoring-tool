@@ -6,6 +6,13 @@ export interface IExtractedAnswer {
   studentAnswer: string;
 }
 
+export interface ICriterionScore {
+  criterionText: string;
+  points: number;
+  maxPoints: number;
+  feedback?: string;
+}
+
 export interface IQuestionScore {
   questionNumber: number;
   points: number;
@@ -15,6 +22,7 @@ export interface IQuestionScore {
   confidence: 'high' | 'medium' | 'low';
   flagForReview: boolean;
   manuallyAdjusted?: boolean;
+  criteriaBreakdown?: ICriterionScore[];
 }
 
 export interface ITestResult extends Document {
@@ -40,6 +48,13 @@ const ExtractedAnswerSchema = new Schema<IExtractedAnswer>({
   studentAnswer: { type: String, required: true },
 });
 
+const CriterionScoreSchema = new Schema<ICriterionScore>({
+  criterionText: { type: String, required: true },
+  points: { type: Number, required: true, min: 0 },
+  maxPoints: { type: Number, required: true, min: 0 },
+  feedback: { type: String },
+});
+
 const QuestionScoreSchema = new Schema<IQuestionScore>({
   questionNumber: { type: Number, required: true },
   points: { type: Number, required: true, min: 0 },
@@ -49,6 +64,7 @@ const QuestionScoreSchema = new Schema<IQuestionScore>({
   confidence: { type: String, enum: ['high', 'medium', 'low'], required: true },
   flagForReview: { type: Boolean, default: false },
   manuallyAdjusted: { type: Boolean, default: false },
+  criteriaBreakdown: { type: [CriterionScoreSchema] },
 });
 
 const TestResultSchema = new Schema<ITestResult>(
@@ -85,9 +101,22 @@ TestResultSchema.virtual('scoringSchema', {
   justOne: true,
 });
 
-// Calculate total score before saving
+// Calculate total score and validate breakdown before saving
 TestResultSchema.pre('save', function (next) {
   if (this.scores.length > 0) {
+    // Validate criteria breakdown sums if present
+    for (const score of this.scores) {
+      if (score.criteriaBreakdown && score.criteriaBreakdown.length > 0) {
+        const breakdownTotal = score.criteriaBreakdown.reduce((sum, c) => sum + c.points, 0);
+        // Allow small floating point differences (tolerance: 0.01)
+        if (Math.abs(breakdownTotal - score.points) > 0.01) {
+          throw new Error(
+            `Question ${score.questionNumber}: Criteria breakdown sum (${breakdownTotal}) must equal total points (${score.points})`
+          );
+        }
+      }
+    }
+
     this.totalScore = this.scores.reduce((sum, s) => sum + s.points, 0);
     this.maxScore = this.scores.reduce((sum, s) => sum + s.maxPoints, 0);
   }

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { testApi, type ReviewUpdateData } from '../services/api';
-import type { TestResult, ScoringSchema, QuestionScore } from '../types';
+import type { TestResult, ScoringSchema, QuestionScore, CriterionScore } from '../types';
+import CriteriaBreakdown from '../components/CriteriaBreakdown';
 
 type TestWithSchema = TestResult & { scoringSchema: ScoringSchema };
 
@@ -15,7 +16,7 @@ export default function ReviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedReasoning, setExpandedReasoning] = useState<number | null>(null);
   const [editingScore, setEditingScore] = useState<number | null>(null);
-  const [editedScores, setEditedScores] = useState<Record<number, { points: number; feedback: string }>>({});
+  const [editedScores, setEditedScores] = useState<Record<number, { points: number; feedback: string; criteriaBreakdown?: CriterionScore[] }>>({});
   const [reviewNotes, setReviewNotes] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
 
@@ -67,6 +68,7 @@ export default function ReviewPage() {
       [questionNumber]: {
         points: score.points,
         feedback: score.feedback,
+        criteriaBreakdown: score.criteriaBreakdown,
       },
     });
   };
@@ -77,6 +79,19 @@ export default function ReviewPage() {
       [questionNumber]: {
         ...editedScores[questionNumber],
         [field]: value,
+      },
+    });
+    setHasChanges(true);
+  };
+
+  const handleCriteriaBreakdownChange = (questionNumber: number, breakdown: CriterionScore[]) => {
+    const newTotal = breakdown.reduce((sum, c) => sum + c.points, 0);
+    setEditedScores({
+      ...editedScores,
+      [questionNumber]: {
+        ...editedScores[questionNumber],
+        points: newTotal,
+        criteriaBreakdown: breakdown,
       },
     });
     setHasChanges(true);
@@ -99,6 +114,7 @@ export default function ReviewPage() {
           questionNumber: parseInt(qNum),
           points: data.points,
           feedback: data.feedback,
+          criteriaBreakdown: data.criteriaBreakdown,
         })),
       };
 
@@ -443,6 +459,20 @@ export default function ReviewPage() {
                               </div>
                             )}
                           </div>
+                        )}
+
+                        {/* Criteria Breakdown Display */}
+                        {score.criteriaBreakdown && score.criteriaBreakdown.length > 0 && (
+                          <CriteriaBreakdown
+                            breakdown={
+                              isEditing && editData?.criteriaBreakdown
+                                ? editData.criteriaBreakdown
+                                : score.criteriaBreakdown
+                            }
+                            isEditing={isEditing}
+                            onUpdate={(breakdown) => handleCriteriaBreakdownChange(answer.questionNumber, breakdown)}
+                            totalMaxPoints={score.maxPoints}
+                          />
                         )}
                       </>
                     )}

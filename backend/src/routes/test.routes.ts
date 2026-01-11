@@ -158,6 +158,7 @@ router.post("/:id/score", async (req: Request, res: Response) => {
         confidence: s.confidence,
         flagForReview: s.flagForReview,
         manuallyAdjusted: false,
+        criteriaBreakdown: s.criteriaBreakdown,
       }));
       testResult.status = "scored";
       await testResult.save();
@@ -262,6 +263,21 @@ router.put("/:id/review", async (req: Request, res: Response) => {
           if (typeof scoreUpdate.flagForReview === "boolean") {
             existingScore.flagForReview = scoreUpdate.flagForReview;
           }
+
+          // Handle criteria breakdown updates
+          if (scoreUpdate.criteriaBreakdown && Array.isArray(scoreUpdate.criteriaBreakdown)) {
+            existingScore.criteriaBreakdown = scoreUpdate.criteriaBreakdown.map((c: { criterionText: string; points: number; maxPoints: number; feedback?: string }) => ({
+              criterionText: c.criterionText,
+              points: Math.max(0, c.points),
+              maxPoints: Math.max(0, c.maxPoints),
+              feedback: c.feedback,
+            }));
+
+            // Recalculate total points from breakdown
+            const breakdownTotal = (existingScore.criteriaBreakdown ?? []).reduce((sum, c) => sum + c.points, 0);
+            existingScore.points = breakdownTotal;
+            existingScore.manuallyAdjusted = true;
+          }
         }
       }
     }
@@ -309,12 +325,36 @@ router.get("/export/csv", async (req: Request, res: Response) => {
 
     // Build CSV header
     const schema = tests[0].scoringSchema;
-    const questionHeaders = (schema?.questions || [])
-      .map((q) => [
-        `Q${q.questionNumber} Score`,
-        `Q${q.questionNumber} Feedback`,
-      ])
-      .flat();
+
+    // Dynamically build headers based on whether questions have criteria
+    const questionHeaders: string[] = [];
+    for (const q of schema?.questions || []) {
+      const hasTest = tests.find(t =>
+        t.scores.some(s =>
+          s.questionNumber === q.questionNumber &&
+          s.criteriaBreakdown &&
+          s.criteriaBreakdown.length > 0
+        )
+      );
+
+      questionHeaders.push(`Q${q.questionNumber} Score`);
+      questionHeaders.push(`Q${q.questionNumber} Feedback`);
+
+      // If any test has breakdown for this question, add breakdown columns
+      if (hasTest) {
+        const maxCriteria = Math.max(
+          ...tests.map(t => {
+            const score = t.scores.find(s => s.questionNumber === q.questionNumber);
+            return score?.criteriaBreakdown?.length || 0;
+          })
+        );
+
+        for (let i = 0; i < maxCriteria; i++) {
+          questionHeaders.push(`Q${q.questionNumber} Criterion ${i + 1}`);
+          questionHeaders.push(`Q${q.questionNumber} Criterion ${i + 1} Points`);
+        }
+      }
+    }
 
     const headers = [
       "Candidate Name",
@@ -336,17 +376,21 @@ router.get("/export/csv", async (req: Request, res: Response) => {
 
       if (!testSchema) return [];
 
-      const questionData = testSchema.questions
-        .map((q) => {
-          const score = test.scores.find(
-            (s) => s.questionNumber === q.questionNumber
-          );
-          return [
-            score ? `${score.points}/${score.maxPoints}` : "-",
-            score?.feedback || "-",
-          ];
-        })
-        .flat();
+      const questionData: string[] = [];
+      for (const q of testSchema.questions) {
+        const score = test.scores.find(s => s.questionNumber === q.questionNumber);
+
+        questionData.push(score ? `${score.points}/${score.maxPoints}` : "-");
+        questionData.push(score?.feedback || "-");
+
+        // Add breakdown data if present
+        if (score?.criteriaBreakdown && score.criteriaBreakdown.length > 0) {
+          for (const criterion of score.criteriaBreakdown) {
+            questionData.push(criterion.criterionText);
+            questionData.push(`${criterion.points}/${criterion.maxPoints}`);
+          }
+        }
+      }
 
       return [
         test.candidateName || "Unnamed",
